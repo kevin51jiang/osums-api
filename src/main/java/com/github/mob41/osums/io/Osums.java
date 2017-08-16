@@ -29,6 +29,7 @@
 package com.github.mob41.osums.io;
 
 import java.io.BufferedReader;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.CookieManager;
@@ -39,6 +40,7 @@ import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.GZIPInputStream;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -103,13 +105,21 @@ public class Osums {
             conn.setRequestProperty("Accept",
                     "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
             conn.setRequestProperty("DNT", "1");
-            // conn.setRequestProperty("Accept-Encoding", "gzip, deflate, br");
+            conn.setRequestProperty("Accept-Encoding", "gzip"); //Accept gzip encoding
             conn.setRequestProperty("Accept-Language", "zh-TW,zh;q=0.8,en;q=0.6");
 
             String data = "";
             String line;
+            
+            String encoding = conn.getHeaderField("Content-Encoding");
+            InputStream in;
+            if (encoding != null && encoding.equals("gzip")){
+                in = new GZIPInputStream(conn.getInputStream());
+            } else {
+                in = conn.getInputStream();
+            }
 
-            BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+            BufferedReader reader = new BufferedReader(new InputStreamReader(in, "UTF-8"));
 
             while ((line = reader.readLine()) != null) {
                 data += line;

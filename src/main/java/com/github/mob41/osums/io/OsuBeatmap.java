@@ -75,12 +75,14 @@ public class OsuBeatmap implements Serializable{
 	private final float bpm;
 	
 	private final float success_rate;
+	
+	private final boolean pageBeatmap;
 
 	private OsuBeatmap(String originalUrl, String name, String[] difficulties, String title,
 			String artist, String creator, String source, String genre, String dwnUrl,
 			String thumbUrl, float circleSize, float approachRate, float hpDrain,
 			float acurracy, float starDifficulty, int badRating, int goodRating,
-			float bpm, float successRate) {
+			float bpm, float successRate, boolean pageBeatmap) {
 		this.originalUrl = originalUrl;
 		this.name = name;
 		this.difficulties = difficulties;
@@ -100,6 +102,7 @@ public class OsuBeatmap implements Serializable{
 		this.good_rating = goodRating;
 		this.bpm = bpm;
 		this.success_rate = successRate;
+		this.pageBeatmap = pageBeatmap;
 	}
 	
 	public String getName(){
@@ -183,6 +186,8 @@ public class OsuBeatmap implements Serializable{
     }
 
 	protected static OsuBeatmap createInstance(String originalUrl, Document doc) throws DebuggableException{
+	    boolean pageBeatmap = originalUrl.contains("/b/");
+	    
 		Elements dwnLinks = doc.getElementsByClass("beatmap_download_link");
 		
 		if (dwnLinks.size() == 0){
@@ -312,12 +317,16 @@ public class OsuBeatmap implements Serializable{
 					case 2:
 						break;
 					case 3: //Circle size (Starfield)
-					    circleSize = parseStarfield("Circle Size", el);
+					    if (pageBeatmap){
+	                        circleSize = parseStarfield("Circle Size", el);
+					    }
 						break;
 					case 4:
 						break;
 					case 5: //Approach rate (Starfield)
-                        approachRate = parseStarfield("Approach Rate", el);
+                        if (pageBeatmap){
+                            approachRate = parseStarfield("Approach Rate", el);
+                        }
 						break;
 					}
 				}
@@ -344,12 +353,16 @@ public class OsuBeatmap implements Serializable{
 					case 2:
 						break;
 					case 3: //HP Drain (Starfield)
-					    starDifficulty = parseStarfield("HP Drain", el);
+                        if (pageBeatmap){
+                            hpDrain = parseStarfield("HP Drain", el);
+                        }
 						break;
 					case 4:
 						break;
 					case 5: //Star Diff (Starfield)
-						starDifficulty = parseStarfield("Star Difficulty", el);
+                        if (pageBeatmap){
+                            starDifficulty = parseStarfield("Star Difficulty", el);
+                        }
 						break;
 					}
 				}
@@ -376,7 +389,9 @@ public class OsuBeatmap implements Serializable{
 					case 2:
 						break;
 					case 3: //Accuracy (Starfield)
-					    accuracy = parseStarfield("Accuracy", el);
+                        if (pageBeatmap){
+                            accuracy = parseStarfield("Accuracy", el);
+                        }
 						break;
 					case 4:
 						break;
@@ -567,7 +582,7 @@ public class OsuBeatmap implements Serializable{
 		return new OsuBeatmap(originalUrl, artist + " - " + title,
 				tabStr, title, artist, creator, source,
 				genre, dwnLnk, thumbUrl, circleSize, approachRate, hpDrain, accuracy, starDifficulty, bad_rating,
-				good_rating, bpm, success_rate);
+				good_rating, bpm, success_rate, pageBeatmap);
 	}
 	
 	private static float parseStarfield(String debugElementName, Element el) throws DebuggableException{
@@ -621,6 +636,7 @@ public class OsuBeatmap implements Serializable{
                     "Invalid float value: " + styleStr,
                     false, e);
         }
+        System.out.println(debugElementName + ": " + activeWidth / totalWidth * 10);
         return activeWidth / totalWidth * 10;
 	}
 	
@@ -662,7 +678,12 @@ public class OsuBeatmap implements Serializable{
 				getStarDifficulty() == map.getStarDifficulty() &&
 				getSuccessRate() == map.getSuccessRate() &&
 				getThumbUrl().equals(map.getThumbUrl()) &&
-				getTitle().equals(map.getTitle());
+				getTitle().equals(map.getTitle()) &&
+				pageBeatmap == map.isPageBeatmap();
 	}
+
+    public boolean isPageBeatmap() {
+        return pageBeatmap;
+    }
 
 }
