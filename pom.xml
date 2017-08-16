@@ -5,4 +5,16 @@
   <version>0.0.1-SNAPSHOT</version>
   <name>osums-api</name>
   <description>osu! map search, management API. osu! in millisecond!</description>
+  <dependencies>
+  	<dependency>
+  		<groupId>org.jsoup</groupId>
+  		<artifactId>jsoup</artifactId>
+  		<version>1.10.1</version>
+  	</dependency>
+  	<dependency>
+  		<groupId>com.github.mob41</groupId>
+  		<artifactId>OrganDebugger</artifactId>
+  		<version>0.0.1-SNAPSHOT</version>
+  	</dependency>
+  </dependencies>
 </project>
