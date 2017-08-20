@@ -26,7 +26,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  *******************************************************************************/
-package com.github.mob41.osums.io;
+package com.github.mob41.osums.io.beatmap;
 
 import java.io.File;
 import java.io.IOException;
@@ -39,6 +39,7 @@ import java.util.List;
 
 import com.github.mob41.organdebug.DebugDump;
 import com.github.mob41.organdebug.DumpManager;
+import com.github.mob41.osums.io.Downloader;
 
 public class OsuDownloader extends Downloader {
 

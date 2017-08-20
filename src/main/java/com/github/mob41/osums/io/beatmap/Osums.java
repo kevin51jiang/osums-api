@@ -26,7 +26,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  *******************************************************************************/
-package com.github.mob41.osums.io;
+package com.github.mob41.osums.io.beatmap;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -38,12 +38,16 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 
 import com.github.mob41.organdebug.exceptions.DebuggableException;
 
@@ -75,6 +79,238 @@ public class Osums {
 
     public Osums() {
         cmgr = new CookieManager();
+    }
+    
+    public ResultBeatmap[] getLinksOfBeatmapSearch(SearchingProgressHandler handler, String searchLink) throws DebuggableException{
+        try {
+            handler.onStart();
+            List<ResultBeatmap> maps = new ArrayList<ResultBeatmap>();
+            
+            int totalPages = 1;
+            for (int i = 1; i <= totalPages; i++){
+                handler.onLoopStart();
+                URL url = new URL(searchLink + "&page=" + i);
+
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+
+                if (cmgr.getCookieStore().getCookies().size() > 0) {
+                    // While joining the Cookies, use ',' or ';' as needed. Most of
+                    // the servers are using ';'
+                    conn.setRequestProperty("Cookie", join(";", cmgr.getCookieStore().getCookies()));
+                }
+
+                conn.setUseCaches(false);
+                conn.setDoOutput(false);
+                conn.setDoInput(true);
+                conn.setAllowUserInteraction(false);
+                conn.setRequestMethod("GET");
+
+                // Fake environment from Chrome
+                conn.setRequestProperty("Connection", "Keep-alive");
+                conn.setRequestProperty("Cache-Control", "max-age=0");
+                conn.setRequestProperty("Origin", "https://osu.ppy.sh");
+                conn.setRequestProperty("Upgrade-Insecure-Requests", "0");
+                conn.setRequestProperty("User-Agent",
+                        "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36");
+                conn.setRequestProperty("Accept",
+                        "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+                conn.setRequestProperty("DNT", "1");
+                conn.setRequestProperty("Accept-Encoding", "gzip"); //Accept gzip encoding
+                conn.setRequestProperty("Accept-Language", "zh-TW,zh;q=0.8,en;q=0.6");
+
+                String data = "";
+                String line;
+                
+                String encoding = conn.getHeaderField("Content-Encoding");
+                InputStream in;
+                if (encoding != null && encoding.equals("gzip")){
+                    in = new GZIPInputStream(conn.getInputStream());
+                } else {
+                    in = conn.getInputStream();
+                }
+
+                BufferedReader reader = new BufferedReader(new InputStreamReader(in, "UTF-8"));
+
+                while ((line = reader.readLine()) != null) {
+                    data += line;
+                }
+
+                Map<String, List<String>> headerFields = conn.getHeaderFields();
+
+                List<String> cookiesHeader = headerFields.get("Set-Cookie");
+
+                if (cookiesHeader != null) {
+                    for (String cookie : cookiesHeader) {
+                        cmgr.getCookieStore().add(null, HttpCookie.parse(cookie).get(0));
+                    }
+                }
+                
+                reader.close();
+
+                Document doc = Jsoup.parse(data);
+                
+                Element pagination = doc.getElementsByClass("pagination").first();
+                String paginationText = pagination.html();
+                
+                int brIndex = paginationText.indexOf("<br>");
+                if (brIndex == -1){
+                    throw new DebuggableException(paginationText, "Get br index in pagination",
+                            "Validate brIndex != -1", "Extract pagination text before br",
+                            "Could not find at least one br element!", false);
+                }
+                
+                String pageText = paginationText.substring(0, brIndex);
+                
+                int displayingIndex = pageText.indexOf("Displaying "); //11
+                int toIndex = pageText.indexOf(" to "); //4
+                int ofIndex = pageText.indexOf(" of "); //4
+                int resultIndex = pageText.indexOf(" results."); //9
+                
+                if (displayingIndex == -1 || toIndex == -1 || ofIndex == -1 || resultIndex == -1){
+                    throw new DebuggableException(paginationText, "Get all text indexes",
+                            "Validate all text indexes != -1", "Extract result pages data",
+                            "The pagination is invalid or unregonized.", false);
+                }
+                
+                //int nowPage = -1;
+                int currPageMaps = -1;
+                int totalResultMaps = -1;
+                try {
+                    //nowPage = Integer.parseInt(pageText.substring(displayingIndex + 11, toIndex));
+                    String currPageMapsStr = pageText.substring(toIndex + 4, ofIndex);
+                    if (!currPageMapsStr.equals("many")){
+                        currPageMaps = Integer.parseInt(currPageMapsStr);
+                    }
+                    
+                    String totalResultMapsStr = pageText.substring(ofIndex + 4, resultIndex);
+                    if (!totalResultMapsStr.equals("many")){
+                        totalResultMaps = Integer.parseInt(totalResultMapsStr);
+                    }
+                } catch (NumberFormatException e){
+                    throw new DebuggableException(pageText, "Validate all text indexes != -1",
+                            "Extract result pages data", "Get page data",
+                            "Pagination number-text data cannot be decoded as number.", false, e);
+                }
+                
+                if (totalResultMaps != -1 && currPageMaps != -1 &&
+                        currPageMaps != totalResultMaps){
+                    
+                    currPageMaps -= 40 * (i - 1);
+                    
+                    System.out.println("Using method 1 to identify Total Pages");
+                    System.out.println("TRM/CPM: " + totalResultMaps + " / " + currPageMaps);
+                    float calc = ((float) totalResultMaps / currPageMaps);
+                    totalPages = (int) calc;
+                    
+                    if (calc != totalPages){
+                        System.out.println("Calc != totalPages: " + calc + " != " + totalPages);
+                        totalPages++;
+                    }
+
+                    System.out.println("Now total pages: " + totalPages);
+                    handler.setTotalPages(totalPages);
+                } else {
+                    System.out.println("Using method 2 to identify Total Pages");
+                    Elements pageLinkEls = pagination.children();
+                    
+                    int size = pageLinkEls.size();
+                    
+                    if (size < 2){
+                        throw new DebuggableException(pageText, "Get page links size",
+                                "Validate children size >= 2", "Get last page link element",
+                                "Invalid page! The page has less than 2 page links!", false);
+                    }
+                    
+                    Element lastPageLinkEl = pageLinkEls.get(size - 2);
+                    
+                    if (lastPageLinkEl != null){
+                        int lastPageNum = -1;
+                        try {
+                            lastPageNum = Integer.parseInt(lastPageLinkEl.html());
+                        } catch (NumberFormatException e){
+                            throw new DebuggableException(pageText, "Get last page link element",
+                                    "Parse last page number String to number", "Set as total page",
+                                    "Pagination last page number-text data cannot be decoded as number.", false, e);
+                        }
+                        
+                        if (lastPageNum > totalPages){
+                            System.out.println("Last page num is bigger than total pages: " + lastPageNum + " > " + totalPages);
+                            totalPages = lastPageNum;
+                        } else {
+                            System.out.println("Last page num is sammler than total pages: " + lastPageNum + " < " + totalPages);
+                        }
+                    }
+                    
+                    handler.setTotalPages(totalPages);
+                }
+                
+                Element beatmapsDiv = doc.select("div.beatmapListing").first();
+                Iterator<Element> it = beatmapsDiv.children().iterator();
+                
+                while(it.hasNext()){
+                    Element el = it.next();
+                    
+                    //TODO: Handle null from first()
+                    Element artistEl = el.select("div.maintext span.artist").first();
+                    
+                    String artist = artistEl.html();
+                    
+                    //TODO: Handle null from first()
+                    Element titleEl = el.select("div.maintext a.title").first();
+                    
+                    String title = titleEl.html();
+                    
+                    //TODO: Handle null from first();
+                    Element creatorEl = el.select("div.left-aligned div a").first();
+                    
+                    String creator = creatorEl.html();
+                    
+                    //TODO: Handle exception
+                    int id = Integer.parseInt(el.attr("id"));
+                    
+                    List<String> tagsList = new ArrayList<String>(30);
+                    Element tagsEl = el.select("div.right-aligned div.tags").first();
+                    
+                    
+                    //TODO: Handle null from first()
+                    Iterator<Element> tagsChildIt = tagsEl.children().iterator();
+                    while(tagsChildIt.hasNext()){
+                        Element childIt = tagsChildIt.next();
+                        
+                        tagsList.add(childIt.html());
+                    }
+                    
+                    //TODO: Implement Hearts and Plays readings
+                    
+                    String[] tags = new String[tagsList.size()];
+                    for (int j = 0; j < tags.length; j++){
+                        tags[j] = tagsList.get(j);
+                    }
+                    
+                    maps.add(new ResultBeatmap(id, artist, title, creator, tags, -1, -1, null, null));
+                    
+                    handler.setBeatmapIndexed(maps.size());
+                }
+                
+                handler.setCompletedPages(i);
+                handler.onLoopEnd();
+            }
+            
+            ResultBeatmap[] out = new ResultBeatmap[maps.size()];
+            
+            for (int i = 0; i < out.length; i++){
+                out[i] = maps.get(i);
+            }
+            
+            handler.onComplete();
+            
+            return out;
+        } catch (Exception e) {
+            handler.onError();
+            throw new DebuggableException(searchLink, "(Try&catch try) getting search result links",
+                    "Throw debuggable exception on catch", "(End of function)",
+                    "Error occurred when getting search result links", false, e);
+        }
     }
 
     public OsuBeatmap getBeatmapInfo(String beatmapLink) throws DebuggableException {

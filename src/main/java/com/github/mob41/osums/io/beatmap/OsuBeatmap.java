@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  *******************************************************************************/
-package com.github.mob41.osums.io;
+package com.github.mob41.osums.io.beatmap;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -38,7 +38,7 @@ import org.jsoup.select.Elements;
 
 import com.github.mob41.organdebug.exceptions.DebuggableException;
 
-public class OsuBeatmap implements Serializable{
+public class OsuBeatmap implements Serializable, BeatmapPage{
 	
 	/**
 	 * 
@@ -688,13 +688,8 @@ public class OsuBeatmap implements Serializable{
 				getStarDifficulty() == map.getStarDifficulty() &&
 				getSuccessRate() == map.getSuccessRate() &&
 				getThumbUrl().equals(map.getThumbUrl()) &&
-				getTitle().equals(map.getTitle()) &&
-				pageBeatmap == map.isPageBeatmap();
+				getTitle().equals(map.getTitle());
 	}
-
-    public boolean isPageBeatmap() {
-        return pageBeatmap;
-    }
     
     public JSONObject toJson(){
         return mapToJson(this);
