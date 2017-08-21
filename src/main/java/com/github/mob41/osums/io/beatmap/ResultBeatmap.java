@@ -1,28 +1,37 @@
 package com.github.mob41.osums.io.beatmap;
 
+//import org.json.JSONArray;
+//import org.json.JSONObject;
+
 import com.github.mob41.organdebug.exceptions.DebuggableException;
 
 public class ResultBeatmap {
     
-    private final int id;
+    private int id;
 
-    private final String artist;
+    private String artist;
     
-    private final String title;
+    private String title;
     
-    private final String creator;
+    private String creator;
     
-    private final String[] tags;
+    private String[] tags;
     
-    private final int favourites;
+    private int favourites;
     
-    private final int plays;
+    private int plays;
     
-    private final String beatmapUrl;
+    private String beatmapUrl;
     
-    private final String thumbUrl;
+    private String thumbUrl;
     
-    public ResultBeatmap(int id, String artist, String title, String creator, String[] tags, int favourites, int plays, String beatmapUrl, String thumbUrl) {
+    private String thumbData;
+    
+    protected ResultBeatmap(){
+        
+    }
+    
+    public ResultBeatmap(int id, String artist, String title, String creator, String[] tags, int favourites, int plays, String beatmapUrl, String thumbUrl, String thumbData) {
         this.id = id;
         this.artist = artist;
         this.title = title;
@@ -32,6 +41,7 @@ public class ResultBeatmap {
         this.plays = plays;
         this.beatmapUrl = beatmapUrl;
         this.thumbUrl = thumbUrl;
+        this.thumbData = thumbData;
     }
 
     public String getArtist() {
@@ -63,7 +73,7 @@ public class ResultBeatmap {
     }
     
     public BeatmapPage getBeatmap(Osums osums) throws DebuggableException{
-        return osums.getBeatmapInfo(this.beatmapUrl);
+        return osums.getBeatmapInfo(beatmapUrl != null ? beatmapUrl : "https://osu.ppy.sh/s/" + id);
     }
 
     public int getId() {
@@ -73,5 +83,46 @@ public class ResultBeatmap {
     public String getThumbUrl() {
         return thumbUrl;
     }
+
+    public String getThumbData() {
+        return thumbData;
+    }
+
+    /*
+    public JSONObject toJson(){
+        JSONArray arr = new JSONArray();
+        
+        for (int i = 0; i < tags.length; i++){
+            arr.put(tags[i]);
+        }
+        
+        JSONObject json = new JSONObject();
+        json.put("id", id);
+        json.put("artist", artist);
+        json.put("title", title);
+        json.put("creator", creator);
+        json.put("tags", arr);
+        json.put("favourites", favourites);
+        json.put("plays", plays);
+        json.put("beatmapUrl", beatmapUrl);
+        json.put("thumbUrl", thumbUrl);
+        json.put("thumbData", thumbData);
+        return json;
+    }
+    
+    public static ResultBeatmap fromJson(JSONObject json){
+        JSONArray tagsArr = json.getJSONArray("tags");
+        String[] tags = new String[tagsArr.length()];
+        for (int i = 0; i < tags.length; i++){
+            tags[i] = tagsArr.getString(i);
+        }
+        
+        return new ResultBeatmap(
+                json.getInt("id"), json.getString("artist"), json.getString("title"),
+                json.getString("creator"), tags, json.getInt("favourites"), json.getInt("plays"),
+                json.getString("beatmapUrl"), json.getString("thumbUrl"), json.getString("thumbData")
+                );
+    }
+    */
 
 }

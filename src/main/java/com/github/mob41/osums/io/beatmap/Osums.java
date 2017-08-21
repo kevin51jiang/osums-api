@@ -28,15 +28,20 @@
  *******************************************************************************/
 package com.github.mob41.osums.io.beatmap;
 
+import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.io.UnsupportedEncodingException;
 import java.net.CookieManager;
 import java.net.HttpCookie;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -44,12 +49,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
+import javax.imageio.ImageIO;
+
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.io.IOUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import com.github.mob41.organdebug.exceptions.DebuggableException;
+import com.github.mob41.osums.indexing.OnlineIndexManager;
 
 public class Osums {
 
@@ -74,11 +84,28 @@ public class Osums {
     public static final String SONG_DIR = "s/";
 
     private final CookieManager cmgr;
+    
+    private final OnlineIndexManager oimgr;
 
     private boolean loggedIn = false;
 
     public Osums() {
         cmgr = new CookieManager();
+        oimgr = new OnlineIndexManager("testing", "osums_indexingDatabase.json", this);
+        try {
+            oimgr.load();
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+    }
+    
+    public ResultBeatmap[] searchMaps(String queryString) throws DebuggableException{
+        if (oimgr.isIndexed()){
+            return oimgr.searchDatabase(queryString);
+        } else {
+            return null;
+        }
     }
     
     public ResultBeatmap[] getLinksOfBeatmapSearch(SearchingProgressHandler handler, String searchLink) throws DebuggableException{
@@ -191,26 +218,26 @@ public class Osums {
                             "Extract result pages data", "Get page data",
                             "Pagination number-text data cannot be decoded as number.", false, e);
                 }
-                
+                System.out.println("Processing page " + i + " / " + totalPages);
                 if (totalResultMaps != -1 && currPageMaps != -1 &&
                         currPageMaps != totalResultMaps){
                     
                     currPageMaps -= 40 * (i - 1);
                     
-                    System.out.println("Using method 1 to identify Total Pages");
-                    System.out.println("TRM/CPM: " + totalResultMaps + " / " + currPageMaps);
+                    //System.out.println("Using method 1 to identify Total Pages");
+                    //System.out.println("TRM/CPM: " + totalResultMaps + " / " + currPageMaps);
                     float calc = ((float) totalResultMaps / currPageMaps);
                     totalPages = (int) calc;
                     
                     if (calc != totalPages){
-                        System.out.println("Calc != totalPages: " + calc + " != " + totalPages);
+                        //System.out.println("Calc != totalPages: " + calc + " != " + totalPages);
                         totalPages++;
                     }
 
-                    System.out.println("Now total pages: " + totalPages);
+                    //System.out.println("Now total pages: " + totalPages);
                     handler.setTotalPages(totalPages);
                 } else {
-                    System.out.println("Using method 2 to identify Total Pages");
+                    //System.out.println("Using method 2 to identify Total Pages");
                     Elements pageLinkEls = pagination.children();
                     
                     int size = pageLinkEls.size();
@@ -247,32 +274,60 @@ public class Osums {
                 Element beatmapsDiv = doc.select("div.beatmapListing").first();
                 Iterator<Element> it = beatmapsDiv.children().iterator();
                 
+                int x = 0;
                 while(it.hasNext()){
                     Element el = it.next();
                     
-                    //TODO: Handle null from first()
                     Element artistEl = el.select("div.maintext span.artist").first();
+                    
+                    if (artistEl == null){
+                        continue;
+                    }
                     
                     String artist = artistEl.html();
                     
-                    //TODO: Handle null from first()
+                    if (artist.isEmpty()){
+                        continue;
+                    }
+                    
                     Element titleEl = el.select("div.maintext a.title").first();
+                    
+                    if (titleEl == null){
+                        continue;
+                    }
                     
                     String title = titleEl.html();
                     
-                    //TODO: Handle null from first();
+                    if (title.isEmpty()){
+                        continue;
+                    }
+                    
                     Element creatorEl = el.select("div.left-aligned div a").first();
+                    
+                    if (creatorEl == null){
+                        continue;
+                    }
                     
                     String creator = creatorEl.html();
                     
-                    //TODO: Handle exception
-                    int id = Integer.parseInt(el.attr("id"));
+                    if (creator.isEmpty()){
+                        continue;
+                    }
+                    
+                    int id = -1;
+                    try {
+                        id = Integer.parseInt(el.attr("id"));
+                    } catch (NumberFormatException e){
+                        continue;
+                    }
                     
                     List<String> tagsList = new ArrayList<String>(30);
                     Element tagsEl = el.select("div.right-aligned div.tags").first();
                     
+                    if (tagsEl == null){
+                        continue;
+                    }
                     
-                    //TODO: Handle null from first()
                     Iterator<Element> tagsChildIt = tagsEl.children().iterator();
                     while(tagsChildIt.hasNext()){
                         Element childIt = tagsChildIt.next();
@@ -287,7 +342,76 @@ public class Osums {
                         tags[j] = tagsList.get(j);
                     }
                     
-                    maps.add(new ResultBeatmap(id, artist, title, creator, tags, -1, -1, null, null));
+                    Element thumbEl = el.select("div.bmlistt").first();
+                    String styleStr = thumbEl.attr("style");
+                    
+                    int startingIndex = styleStr.indexOf("background: url(\""); //17
+                    int endingIndex = styleStr.indexOf("\")"); //4
+                    
+                    if (startingIndex == -1 || endingIndex == -1){
+                        System.out.println(styleStr);
+                        return null;
+                    }
+                    
+                    String thumbUrl = "https:" + styleStr.substring(startingIndex + 17,  endingIndex);
+                    
+                    String thumbData = "";
+                    
+//                    try {
+//                        URL tu = new URL(thumbUrl);
+//                        
+//                        HttpURLConnection tuConn = (HttpURLConnection) tu.openConnection();
+//
+//                        if (cmgr.getCookieStore().getCookies().size() > 0) {
+//                            // While joining the Cookies, use ',' or ';' as needed. Most of
+//                            // the servers are using ';'
+//                            tuConn.setRequestProperty("Cookie", join(";", cmgr.getCookieStore().getCookies()));
+//                        }
+//                        
+//                        tuConn.setConnectTimeout(100);
+//                        //tuConn.setUseCaches(false);
+//                        //tuConn.setDoOutput(false);
+//                        tuConn.setDoInput(true);
+//                        tuConn.setAllowUserInteraction(false);
+//                        tuConn.setRequestMethod("GET");
+//
+//                        // Fake environment from Chrome
+//                        tuConn.setRequestProperty("Connection", "Keep-alive");
+//                        tuConn.setRequestProperty("Cache-Control", "max-age=0");
+//                        tuConn.setRequestProperty("Origin", "https://osu.ppy.sh");
+//                        tuConn.setRequestProperty("Upgrade-Insecure-Requests", "0");
+//                        tuConn.setRequestProperty("User-Agent",
+//                                "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36");
+//                        tuConn.setRequestProperty("Accept",
+//                                "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+//                        tuConn.setRequestProperty("DNT", "1");
+//                        tuConn.setRequestProperty("Accept-Encoding", "gzip"); //Accept gzip encoding
+//                        tuConn.setRequestProperty("Accept-Language", "zh-TW,zh;q=0.8,en;q=0.6");
+//                        
+//                        String tuEncoding = tuConn.getHeaderField("Content-Encoding");
+//                        InputStream tuIn;
+//                        if (tuEncoding != null && tuEncoding.equals("gzip")){
+//                            tuIn = new GZIPInputStream(tuConn.getInputStream());
+//                        } else {
+//                            tuIn = tuConn.getInputStream();
+//                        }
+//                        
+//                        BufferedImage image = ImageIO.read(tuIn);
+//                        
+//                        //ByteArrayOutputStream b = new ByteArrayOutputStream();
+//                        //ImageIO.write(image, "jpg", b);
+//                        thumbData = Base64.encodeBase64String(IOUtils.toByteArray(tuIn));
+//                        tuIn.close();
+//                    } catch (IOException ignore){
+//                        ignore.printStackTrace();
+//                    }
+                    
+                    maps.add(new ResultBeatmap(
+                            id, escape(artist), escape(title),
+                            escape(creator), tags, -1,
+                            -1, "https://osu.ppy.sh" + titleEl.attr("href"),
+                            thumbUrl, thumbData
+                            ));
                     
                     handler.setBeatmapIndexed(maps.size());
                 }
@@ -310,6 +434,15 @@ public class Osums {
             throw new DebuggableException(searchLink, "(Try&catch try) getting search result links",
                     "Throw debuggable exception on catch", "(End of function)",
                     "Error occurred when getting search result links", false, e);
+        }
+    }
+    
+    private static String escape(String str){
+        try {
+            return URLEncoder.encode(str, "UTF-8").replaceAll("%(..)%(..)", "%u$1$2");
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+            return null;
         }
     }
 
@@ -569,6 +702,10 @@ public class Osums {
             return 0;
         }
         return -1;
+    }
+
+    public OnlineIndexManager getOimgr() {
+        return oimgr;
     }
 
 }

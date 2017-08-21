@@ -1,6 +1,6 @@
 package com.github.mob41.osums.io.beatmap;
 
-public class OsuSong implements BeatmapPage {
+public class OsuSong extends BeatmapPage {
 
     public OsuSong() {
         // TODO Auto-generated constructor stub

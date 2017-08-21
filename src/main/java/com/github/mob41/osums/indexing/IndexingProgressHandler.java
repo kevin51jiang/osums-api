@@ -12,11 +12,17 @@ public abstract class IndexingProgressHandler {
     
     public static final int STATUS_COMPLETED = 4;
     
+    public static final int SEARCHING_MAPS = 0;
+    
+    public static final int DOWNLOADING_INFO = 1;
+    
     private int beatmapIndexed = 0;
 
     private int totalPages = 0;
     
     private int completedPages = 0;
+    
+    private int mode = SEARCHING_MAPS;
     
     private int status = STATUS_STOPPED;
     
@@ -55,6 +61,14 @@ public abstract class IndexingProgressHandler {
     public final int getStatus() {
         return status;
     }
+
+    protected final void setMode(int mode) {
+        this.mode = mode;
+    }
+
+    public int getMode() {
+        return mode;
+    }
     
     public abstract boolean onStart();
     
@@ -63,5 +77,8 @@ public abstract class IndexingProgressHandler {
     public abstract boolean onError();
     
     public abstract boolean onComplete();
-
+    
+    public abstract boolean onLoopStart();
+    
+    public abstract boolean onLoopEnd();
 }

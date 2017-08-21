@@ -31,14 +31,14 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 
 import org.apache.commons.codec.binary.Base64;
-import org.json.JSONObject;
+//import org.json.JSONObject;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import com.github.mob41.organdebug.exceptions.DebuggableException;
 
-public class OsuBeatmap implements Serializable, BeatmapPage{
+public class OsuBeatmap extends BeatmapPage implements Serializable{
 	
 	/**
 	 * 
@@ -691,6 +691,7 @@ public class OsuBeatmap implements Serializable, BeatmapPage{
 				getTitle().equals(map.getTitle());
 	}
     
+	/*
     public JSONObject toJson(){
         return mapToJson(this);
     }
@@ -730,5 +731,6 @@ public class OsuBeatmap implements Serializable, BeatmapPage{
                 json.getInt("goodRating"), (float) json.getDouble("bpm"), (float) json.getDouble("successRate"),
                 true);
     }
+    */
 
 }

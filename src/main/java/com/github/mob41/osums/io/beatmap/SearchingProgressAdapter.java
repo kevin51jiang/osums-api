@@ -1,11 +1,7 @@
-package com.github.mob41.osums.indexing;
+package com.github.mob41.osums.io.beatmap;
 
-public class IndexingProgressAdapter extends IndexingProgressHandler {
-
-    public IndexingProgressAdapter() {
-        
-    }
-
+public class SearchingProgressAdapter extends SearchingProgressHandler {
+    
     @Override
     public boolean onStart() {
         return true;

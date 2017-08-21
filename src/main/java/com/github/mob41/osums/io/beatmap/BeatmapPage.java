@@ -1,33 +1,36 @@
 package com.github.mob41.osums.io.beatmap;
 
-public interface BeatmapPage {
+public abstract class BeatmapPage {
 
-    public String getTitle();
+    public abstract String getTitle();
     
-    public String getArtist();
+    public abstract String getArtist();
     
-    public String getCreator();
+    public abstract String getCreator();
 
-    public String getSource();
+    public abstract String getSource();
 
-    public String getGenre();
+    public abstract String getGenre();
 
-    public String getDwnUrl();
+    public abstract String getDwnUrl();
 
-    public String getThumbUrl();
+    public abstract String getThumbUrl();
 
-    public float getStarDifficulty();
+    public abstract float getStarDifficulty();
 
-    public int getBadRating();
+    public abstract int getBadRating();
 
-    public int getGoodRating();
+    public abstract int getGoodRating();
     
-    public float getRating();
+    public abstract float getRating();
 
-    public float getBpm();
+    public abstract float getBpm();
 
-    public float getSuccessRate();
+    public abstract float getSuccessRate();
 
-    public String getOriginalUrl();
+    public abstract String getOriginalUrl();
     
+    public ResultBeatmap toResultBeatmap(){
+        return new ResultBeatmap(-1, getArtist(), getTitle(), getCreator(), null, -1, -1, getOriginalUrl(), getThumbUrl(), null);
+    }
 }
