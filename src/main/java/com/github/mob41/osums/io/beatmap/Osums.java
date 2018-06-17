@@ -28,9 +28,12 @@
  *******************************************************************************/
 package com.github.mob41.osums.io.beatmap;
 
+import java.awt.Toolkit;
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -50,6 +53,7 @@ import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 import javax.imageio.ImageIO;
+import javax.swing.JOptionPane;
 
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.io.IOUtils;
@@ -69,11 +73,13 @@ public class Osums {
 
     public static final int INVALID_USERNAME_PASSWORD = 1;
 
-    private static final String LOGOUT_URL = "http://osu.ppy.sh/forum/ucp.php?mode=logout";
+    private static final String LOGOUT_URL = "http://old.ppy.sh/forum/ucp.php?mode=logout";
 
-    private static final String LOGIN_URL = "http://osu.ppy.sh/forum/ucp.php?mode=login";
+    private static final String LOGIN_URL = "http://old.ppy.sh/forum/ucp.php?mode=login";
 
-    private static final String INDEX_LOCATION_URL = "http://osu.ppy.sh/forum/index.php";
+    private static final String INDEX_LOCATION_URL = "http://old.ppy.sh/forum/index.php";
+
+    private static final String INDEX_LOCATION_NO_INDEXPHP_URL = "http://old.ppy.sh/forum/";
 
     public static final String URL_PREFIX = "http://osu.ppy.sh/";
 
@@ -91,7 +97,7 @@ public class Osums {
 
     public Osums() {
         cmgr = new CookieManager();
-        oimgr = new OnlineIndexManager("testing", "osums_indexingDatabase.json", this);
+        oimgr = new OnlineIndexManager(System.getenv("LOCALAPPDATA") + "\\osumerExpress", "osums_indexingDatabase.json", this);
         try {
             oimgr.load();
         } catch (IOException e) {
@@ -243,32 +249,36 @@ public class Osums {
                     int size = pageLinkEls.size();
                     
                     if (size < 2){
+                        totalPages = 1;
+                        handler.setTotalPages(1);
+                        /*
                         throw new DebuggableException(pageText, "Get page links size",
                                 "Validate children size >= 2", "Get last page link element",
                                 "Invalid page! The page has less than 2 page links!", false);
-                    }
-                    
-                    Element lastPageLinkEl = pageLinkEls.get(size - 2);
-                    
-                    if (lastPageLinkEl != null){
-                        int lastPageNum = -1;
-                        try {
-                            lastPageNum = Integer.parseInt(lastPageLinkEl.html());
-                        } catch (NumberFormatException e){
-                            throw new DebuggableException(pageText, "Get last page link element",
-                                    "Parse last page number String to number", "Set as total page",
-                                    "Pagination last page number-text data cannot be decoded as number.", false, e);
+                        */
+                    } else {
+                        Element lastPageLinkEl = pageLinkEls.get(size - 2);
+                        
+                        if (lastPageLinkEl != null){
+                            int lastPageNum = -1;
+                            try {
+                                lastPageNum = Integer.parseInt(lastPageLinkEl.html());
+                            } catch (NumberFormatException e){
+                                throw new DebuggableException(pageText, "Get last page link element",
+                                        "Parse last page number String to number", "Set as total page",
+                                        "Pagination last page number-text data cannot be decoded as number.", false, e);
+                            }
+                            
+                            if (lastPageNum > totalPages){
+                                System.out.println("Last page num is bigger than total pages: " + lastPageNum + " > " + totalPages);
+                                totalPages = lastPageNum;
+                            } else {
+                                System.out.println("Last page num is sammler than total pages: " + lastPageNum + " < " + totalPages);
+                            }
                         }
                         
-                        if (lastPageNum > totalPages){
-                            System.out.println("Last page num is bigger than total pages: " + lastPageNum + " > " + totalPages);
-                            totalPages = lastPageNum;
-                        } else {
-                            System.out.println("Last page num is sammler than total pages: " + lastPageNum + " < " + totalPages);
-                        }
+                        handler.setTotalPages(totalPages);
                     }
-                    
-                    handler.setTotalPages(totalPages);
                 }
                 
                 Element beatmapsDiv = doc.select("div.beatmapListing").first();
@@ -462,6 +472,7 @@ public class Osums {
             conn.setDoOutput(false);
             conn.setDoInput(true);
             conn.setAllowUserInteraction(false);
+            conn.setInstanceFollowRedirects(false);
             conn.setRequestMethod("GET");
 
             // Fake environment from Chrome
@@ -495,7 +506,22 @@ public class Osums {
             }
 
             Map<String, List<String>> headerFields = conn.getHeaderFields();
-
+            
+            Iterator<String> it = headerFields.keySet().iterator();
+            String key;
+            while (it.hasNext()) {
+                key = it.next();
+                if (key != null && key.toLowerCase().equals("location")) {
+                    new Thread() {
+                        public void run() {
+                            Toolkit.getDefaultToolkit().beep();
+                            JOptionPane.showInputDialog("Sorry, this beatmap redirects to new osu! layout page, which is not supported currently.\nYou are recommended to enable old-site redirection in Preferences to fix this problem temporarily.\nPlease manually download it in a browser:", beatmapLink);
+                        }
+                    }.start();
+                    return null;
+                }
+            }
+            
             List<String> cookiesHeader = headerFields.get("Set-Cookie");
 
             if (cookiesHeader != null) {
@@ -523,6 +549,55 @@ public class Osums {
             throw new DebuggableException(beatmapLink, "(Try&catch try) getting beatmap info",
                     "Throw debuggable exception on catch", "(End of function)",
                     "Error occurred when getting beatmap info", false, e);
+        }
+    }
+    
+    public boolean isLoggedIn() {
+        try {
+            return loggedIn && testLoggedIn();
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    public boolean testLoggedIn() throws IOException{
+        URL url = new URL(LOGIN_URL);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+
+        conn.setRequestMethod("GET");
+        conn.setInstanceFollowRedirects(false);
+
+        if (cmgr.getCookieStore().getCookies().size() > 0) {
+            // While joining the Cookies, use ',' or ';' as needed. Most of
+            // the servers are using ';'
+            conn.setRequestProperty("Cookie", join(";", cmgr.getCookieStore().getCookies()));
+        }
+
+        // Fake environment from Chrome
+        conn.setRequestProperty("Connection", "Keep-alive");
+        conn.setRequestProperty("Cache-Control", "max-age=0");
+        conn.setRequestProperty("Origin", "https://osu.ppy.sh");
+        conn.setRequestProperty("Upgrade-Insecure-Requests", "0");
+        conn.setRequestProperty("User-Agent",
+                "User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36");
+        conn.setRequestProperty("Accept",
+                "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+        conn.setRequestProperty("DNT", "1");
+        conn.setRequestProperty("Accept-Encoding", "gzip, deflate, br");
+        conn.setRequestProperty("Accept-Language", "zh-TW,zh;q=0.8,en;q=0.6");
+        
+        Map<String, List<String>> headerFields = conn.getHeaderFields();
+
+        List<String> locationHeader = headerFields.get("Location");
+        
+        System.out.println(locationHeader.get(0));
+
+        if (locationHeader == null || locationHeader.size() != 1
+                || !locationHeader.get(0).startsWith(INDEX_LOCATION_NO_INDEXPHP_URL)) {
+            return false;
+        } else {
+            return true;
         }
     }
 
@@ -577,7 +652,8 @@ public class Osums {
             // conn.setRequestProperty("charset", "utf-8");
             conn.setRequestProperty("Content-Length", Integer.toString(postLen));
 
-            OutputStreamWriter wr = new OutputStreamWriter(conn.getOutputStream());
+            DataOutputStream dos = new DataOutputStream(conn.getOutputStream());
+            BufferedWriter wr = new BufferedWriter(new OutputStreamWriter(dos, "UTF-8"));
             wr.write(urlPara);
             wr.close();
 
@@ -593,7 +669,7 @@ public class Osums {
             List<String> locationHeader = headerFields.get("Location");
 
             if (locationHeader == null || locationHeader.size() != 1
-                    || !locationHeader.get(0).equals(INDEX_LOCATION_URL)) {
+                    || !locationHeader.get(0).startsWith(INDEX_LOCATION_URL)) {
                 throw new DebuggableException("", "Get \"Location\" from headerFields and assign to locationHeader",
                         "Validate locationHeader is not null or locationHeader.size() is 1 or locationHeader.get(0) is equal to INDEX_LOCATION_URL",
                         "Get \"Set-Cookie\" from headerFields and assign to cookiesHeader",

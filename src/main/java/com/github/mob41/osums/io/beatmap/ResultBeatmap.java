@@ -1,5 +1,8 @@
 package com.github.mob41.osums.io.beatmap;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+
 //import org.json.JSONArray;
 //import org.json.JSONObject;
 

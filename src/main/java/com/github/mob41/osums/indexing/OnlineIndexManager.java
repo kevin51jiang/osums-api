@@ -7,6 +7,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,13 +24,13 @@ import com.github.mob41.osums.io.beatmap.SearchingProgressHandler;
 
 public class OnlineIndexManager {
     
-    private static final String RANKED_INDEX = "https://osu.ppy.sh/p/beatmaplist?l=1&r=0&q=&g=0&la=0&ra=&s=4&o=1&m=-1";
+    private static final String RANKED_INDEX = "https://old.ppy.sh/p/beatmaplist?l=1&r=0&q=&g=0&la=0&ra=&s=4&o=1&m=-1";
     
-    private static final String QUALIFIED_INDEX = "https://osu.ppy.sh/p/beatmaplist&s=4&r=11";
+    private static final String QUALIFIED_INDEX = "https://old.ppy.sh/p/beatmaplist&s=4&r=11";
     
-    private static final String LOVED_INDEX = "https://osu.ppy.sh/p/beatmaplist&s=4&r=12";
+    private static final String LOVED_INDEX = "https://old.ppy.sh/p/beatmaplist&s=4&r=12";
     
-    private static final String PENDING_INDEX = "https://osu.ppy.sh/p/beatmaplist&s=7&r=2";
+    private static final String PENDING_INDEX = "https://old.ppy.sh/p/beatmaplist&s=7&r=2";
 
     //private static final String RANKED_INDEX = "https://osu.ppy.sh/p/beatmaplist?q=naruto&m=-1&r=0&g=0&la=0";
     
@@ -74,13 +76,15 @@ public class OnlineIndexManager {
                 results.add(map);
             }
             */
-            try {
-                if (map.writeValueAsString(indexes.get(i)).toLowerCase().contains(queryString)){
-                    results.add(indexes.get(i));
-                }
-            } catch (JsonProcessingException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
+            //System.out.println("Processing " + i);
+            //System.out.println(indexes.get(i).getTitle());
+
+
+            if (indexes.get(i).getArtist().toLowerCase().contains(queryString) ||
+                    indexes.get(i).getCreator().toLowerCase().contains(queryString) ||
+                    indexes.get(i).getTitle().toLowerCase().contains(queryString) ||
+                    queryString.contains("" + indexes.get(i).getId())){
+                results.add(indexes.get(i));
             }
         }
         
@@ -140,23 +144,22 @@ public class OnlineIndexManager {
     public boolean startIndexing(IndexingProgressHandler handler) throws DebuggableException{
         handler.setMode(IndexingProgressHandler.SEARCHING_MAPS);
         handler.onStart();
+        indexes.clear();
         
         int total = 0;
         
-        /*System.out.println("==================Doing RANKED");
+        System.out.println("==================Doing RANKED");
         ResultBeatmap[] smaps = doMapSearch(handler, total, RANKED_INDEX);
         
         total += smaps.length;
-        indexes.clear();
         for (ResultBeatmap map : smaps){
             indexes.add(map);
-        }*/
+        }
 
         System.out.println("==================Doing QUALIFIED");
-        ResultBeatmap[] smaps = doMapSearch(handler, total, QUALIFIED_INDEX);
+        smaps = doMapSearch(handler, total, QUALIFIED_INDEX);
         
         total += smaps.length;
-        indexes.clear();
         for (ResultBeatmap map : smaps){
             indexes.add(map);
         }
@@ -165,7 +168,6 @@ public class OnlineIndexManager {
         smaps = doMapSearch(handler, total, LOVED_INDEX);
         
         total += smaps.length;
-        indexes.clear();
         for (ResultBeatmap map : smaps){
             indexes.add(map);
         }
@@ -174,7 +176,6 @@ public class OnlineIndexManager {
         smaps = doMapSearch(handler, total, PENDING_INDEX);
         
         total += smaps.length;
-        indexes.clear();
         for (ResultBeatmap map : smaps){
             indexes.add(map);
         }
